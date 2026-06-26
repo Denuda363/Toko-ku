@@ -153,8 +153,43 @@ export default function Accounting({
     return Object.values(dataMap).sort((a, b) => a.sortKey.localeCompare(b.sortKey));
   }, [transactions, expenses, filterType, filterValue]);
 
-  // Filter lists
-  const filteredExpenses = expenses.filter(e => isMatchFilter(e.date)).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const combinedHistory = useMemo(() => {
+    const history: Array<{
+      id: string;
+      date: string;
+      type: 'Penjualan' | 'Pembelian' | 'Pengeluaran';
+      description: string;
+      amount: number;
+      isPositive: boolean;
+      originalData: any;
+    }> = [];
+
+    transactions.filter(t => isMatchFilter(t.date)).forEach(t => {
+      history.push({
+        id: t.id,
+        date: t.date,
+        type: t.type === 'SALE' ? 'Penjualan' : 'Pembelian',
+        description: t.type === 'SALE' ? `Penjualan ${t.items.length} item` : `Pembelian ${t.items.length} item`,
+        amount: t.total,
+        isPositive: t.type === 'SALE',
+        originalData: t
+      });
+    });
+
+    expenses.filter(e => isMatchFilter(e.date)).forEach(e => {
+      history.push({
+        id: e.id,
+        date: e.date,
+        type: 'Pengeluaran',
+        description: e.description,
+        amount: e.amount,
+        isPositive: false,
+        originalData: e
+      });
+    });
+
+    return history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, expenses, filterType, filterValue]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -310,7 +345,48 @@ export default function Accounting({
           </div>
         </div>
       ) : activeTab === 'laba-rugi' ? (
-        <>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-emerald-500/10 backdrop-blur-xl p-6 rounded-2xl border border-emerald-500/20 shadow-sm">
+              <p className="text-[10px] uppercase font-semibold text-emerald-400 mb-2">Total Kas Masuk</p>
+              <p className="text-3xl font-bold text-emerald-400">{formatIDR(totalSales)}</p>
+            </div>
+            <div className="bg-rose-500/10 backdrop-blur-xl p-6 rounded-2xl border border-rose-500/20 shadow-sm">
+              <p className="text-[10px] uppercase font-semibold text-rose-400 mb-2">Total Kas Keluar</p>
+              <p className="text-3xl font-bold text-rose-400">{formatIDR(totalPurchases + totalExpenses)}</p>
+            </div>
+            <div className={`${netProfit >= 0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-rose-500/10 border-rose-500/20'} backdrop-blur-xl p-6 rounded-2xl border shadow-sm`}>
+              <p className={`text-[10px] uppercase font-semibold mb-2 ${netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>Posisi Kas (Laba Bersih)</p>
+              <p className={`text-3xl font-bold ${netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatIDR(netProfit)}</p>
+            </div>
+          </div>
+
+          <div className="bg-black/20 backdrop-blur-xl rounded-2xl shadow-sm border border-white/10 p-6 overflow-hidden">
+            <h3 className="font-bold text-white mb-6">Laporan Laba Rugi ({filterValue})</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-slate-300">Pendapatan Penjualan</span>
+                <span className="font-bold text-emerald-400">{formatIDR(totalSales)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-slate-300">Harga Pokok Penjualan (HPP)</span>
+                <span className="font-bold text-rose-400">-{formatIDR(totalPurchases)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/10">
+                <span className="font-bold text-white">Laba Kotor</span>
+                <span className="font-bold text-white">{formatIDR(grossProfit)}</span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-white/5">
+                <span className="text-slate-300">Pengeluaran Operasional</span>
+                <span className="font-bold text-rose-400">-{formatIDR(totalExpenses)}</span>
+              </div>
+              <div className="flex justify-between items-center pt-4 mt-4 border-t border-white/20">
+                <span className="font-bold text-lg text-white">Laba Bersih</span>
+                <span className={`font-bold text-xl ${netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatIDR(netProfit)}</span>
+              </div>
+            </div>
+          </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Form Pengeluaran */}
         <div className="bg-black/20 backdrop-blur-xl rounded-2xl shadow-sm border border-white/10 p-6 h-fit">
@@ -355,37 +431,48 @@ export default function Accounting({
           </form>
         </div>
 
-        {/* Daftar Pengeluaran */}
+        {/* Daftar Transaksi */}
         <div className="lg:col-span-2 bg-black/20 backdrop-blur-xl rounded-2xl shadow-sm border border-white/10 overflow-hidden">
           <div className="p-6 border-b border-white/10 bg-white/5">
-            <h3 className="font-bold text-white">Riwayat Pengeluaran ({filterValue})</h3>
+            <h3 className="font-bold text-white">Riwayat Transaksi & Pengeluaran ({filterValue})</h3>
           </div>
-          <div className="divide-y divide-white/5">
-            {filteredExpenses.length === 0 ? (
-              <div className="p-8 text-center text-slate-400">Tidak ada data pengeluaran di periode ini.</div>
+          <div className="divide-y divide-white/5 h-[500px] overflow-y-auto">
+            {combinedHistory.length === 0 ? (
+              <div className="p-8 text-center text-slate-400">Tidak ada data transaksi di periode ini.</div>
             ) : (
-              filteredExpenses.map(expense => (
-                <div key={expense.id} className="p-6 flex justify-between items-center hover:bg-white/5 transition-colors">
+              combinedHistory.map(item => (
+                <div key={item.id} className="p-6 flex justify-between items-center hover:bg-white/5 transition-colors">
                   <div>
-                    <p className="font-medium text-white">{expense.description}</p>
-                    <p className="text-xs text-slate-400 mt-1">{new Date(expense.date).toLocaleDateString('id-ID')} &bull; {expense.category}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
+                        item.type === 'Penjualan' ? 'bg-emerald-500/20 text-emerald-400' :
+                        item.type === 'Pembelian' ? 'bg-rose-500/20 text-rose-400' :
+                        'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {item.type}
+                      </span>
+                      <p className="font-medium text-white">{item.description}</p>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">{new Date(item.date).toLocaleDateString('id-ID')} {item.type === 'Pengeluaran' ? `• ${item.originalData.category}` : ''}</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="font-bold text-rose-400 text-right">
-                      -{formatIDR(expense.amount)}
+                    <div className={`font-bold text-right ${item.isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {item.isPositive ? '+' : '-'}{formatIDR(item.amount)}
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => handleEditClick(expense)} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/20 rounded-lg transition-colors" title="Edit">
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => {
-                        if (window.confirm('Hapus pengeluaran ini?')) {
-                          onDeleteExpense(expense.id);
-                        }
-                      }} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors" title="Hapus">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {item.type === 'Pengeluaran' && (
+                      <div className="flex gap-2">
+                        <button onClick={() => handleEditClick(item.originalData)} className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/20 rounded-lg transition-colors" title="Edit">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => {
+                          if (window.confirm('Hapus pengeluaran ini?')) {
+                            onDeleteExpense(item.id);
+                          }
+                        }} className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors" title="Hapus">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))
@@ -393,7 +480,7 @@ export default function Accounting({
           </div>
         </div>
       </div>
-        </>
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Form Utang */}

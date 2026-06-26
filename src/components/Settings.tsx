@@ -76,7 +76,7 @@ export default function Settings({ onExportData, onImportData, onResetData }: Se
               <form className="space-y-5">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wide">Nama Toko</label>
-                  <input type="text" defaultValue="KelontongKu Jaya" className="w-full bg-black/50 border border-white/10 text-white rounded-lg p-2.5 focus:border-slate-500 outline-none" />
+                  <input type="text" defaultValue="Dn-Toko Jaya" className="w-full bg-black/50 border border-white/10 text-white rounded-lg p-2.5 focus:border-slate-500 outline-none" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wide">Nomor Telepon</label>
@@ -88,7 +88,7 @@ export default function Settings({ onExportData, onImportData, onResetData }: Se
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wide">Pesan di Struk Bawah</label>
-                  <input type="text" defaultValue="Terima kasih telah berbelanja di KelontongKu!" className="w-full bg-black/50 border border-white/10 text-white rounded-lg p-2.5 focus:border-slate-500 outline-none" />
+                  <input type="text" defaultValue="Terima kasih telah berbelanja di Dn-Toko!" className="w-full bg-black/50 border border-white/10 text-white rounded-lg p-2.5 focus:border-slate-500 outline-none" />
                 </div>
                 
                 <div className="pt-4 flex justify-end">

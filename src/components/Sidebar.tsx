@@ -34,7 +34,7 @@ export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
                <span className="font-bold text-black text-xl">K</span>
             </div>
-            <h1 className="text-xl font-bold tracking-tight">Kelontong<span className="text-emerald-400 text-xs ml-1">PRO</span></h1>
+            <h1 className="text-xl font-bold tracking-tight">Dn-Toko</h1>
           </div>
           <nav className="flex-1 py-6">
             <ul className="space-y-1 px-3">

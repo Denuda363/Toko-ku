@@ -59,7 +59,7 @@ export default function App() {
           <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
              <span className="font-bold text-black text-xl">K</span>
           </div>
-          <h1 className="text-xl font-bold tracking-tight">Kelontong<span className="text-emerald-400 text-xs ml-1">PRO</span></h1>
+          <h1 className="text-xl font-bold tracking-tight">Dn-Toko</h1>
         </div>
         <Notifications products={store.products} debts={store.debts} />
       </div>
