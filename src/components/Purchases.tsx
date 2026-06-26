@@ -7,10 +7,11 @@ interface PurchasesProps {
   products: Product[];
   transactions: Transaction[];
   onPurchase: (items: TransactionItem[], total: number, paymentMethod: 'tunai' | 'tempo' | 'tf', date?: string) => void;
+  onUpdateTransaction: (id: string, items: TransactionItem[], total: number, paymentMethod: 'tunai' | 'tempo' | 'tf', date?: string) => void;
   onCancelTransaction: (id: string) => void;
 }
 
-export default function Purchases({ products, transactions, onPurchase, onCancelTransaction }: PurchasesProps) {
+export default function Purchases({ products, transactions, onPurchase, onUpdateTransaction, onCancelTransaction }: PurchasesProps) {
   const [selectedProduct, setSelectedProduct] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -19,6 +20,8 @@ export default function Purchases({ products, transactions, onPurchase, onCancel
   const [cart, setCart] = useState<TransactionItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'tunai' | 'tempo' | 'tf'>('tunai');
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+
   const getLocalDatetime = (dateString?: string) => {
     const d = dateString ? new Date(dateString) : new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -80,7 +83,12 @@ export default function Purchases({ products, transactions, onPurchase, onCancel
 
   const handleSubmit = () => {
     if (cart.length === 0) return;
-    onPurchase(cart, total, paymentMethod, new Date(transactionDate).toISOString());
+    if (editingTransactionId) {
+      onUpdateTransaction(editingTransactionId, cart, total, paymentMethod, new Date(transactionDate).toISOString());
+      setEditingTransactionId(null);
+    } else {
+      onPurchase(cart, total, paymentMethod, new Date(transactionDate).toISOString());
+    }
     setCart([]);
     setSelectedProduct('');
     setSearchTerm('');
@@ -275,12 +283,27 @@ export default function Purchases({ products, transactions, onPurchase, onCancel
                     </select>
                   </div>
                 </div>
-                <button 
-                  onClick={handleSubmit}
-                  className="w-full md:w-auto bg-blue-500 hover:bg-blue-400 text-white px-8 py-3 rounded-lg font-bold transition-colors uppercase text-sm mt-4 md:mt-0"
-                >
-                  Simpan Transaksi Pembelian
-                </button>
+                <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto mt-4 md:mt-0">
+                  {editingTransactionId && (
+                    <button 
+                      onClick={() => {
+                        setEditingTransactionId(null);
+                        setCart([]);
+                        setTransactionDate(getLocalDatetime());
+                        setPaymentMethod('tunai');
+                      }}
+                      className="w-full md:w-auto bg-white/10 hover:bg-white/20 text-white px-8 py-3 rounded-lg font-bold transition-colors uppercase text-sm"
+                    >
+                      Batal Edit
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleSubmit}
+                    className="w-full md:w-auto bg-blue-500 hover:bg-blue-400 text-white px-8 py-3 rounded-lg font-bold transition-colors uppercase text-sm"
+                  >
+                    {editingTransactionId ? 'Simpan Perubahan' : 'Simpan Transaksi Pembelian'}
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -319,15 +342,13 @@ export default function Purchases({ products, transactions, onPurchase, onCancel
                     <div className="flex gap-2">
                       <button 
                         onClick={() => {
-                          if (window.confirm('Edit transaksi pembelian ini? Stok akan dikurangi sementara dari inventaris sampai Anda menyimpannya ulang.')) {
-                            onCancelTransaction(trx.id);
-                            setCart([...trx.items]);
-                            setTransactionDate(getLocalDatetime(trx.date));
-                            if (trx.paymentMethod) {
-                              setPaymentMethod(trx.paymentMethod);
-                            }
-                            setIsHistoryOpen(false);
+                          setEditingTransactionId(trx.id);
+                          setCart([...trx.items]);
+                          setTransactionDate(getLocalDatetime(trx.date));
+                          if (trx.paymentMethod) {
+                            setPaymentMethod(trx.paymentMethod);
                           }
+                          setIsHistoryOpen(false);
                         }}
                         className="p-2 text-amber-400 hover:bg-amber-500/20 rounded-lg transition-colors border border-amber-500/20"
                         title="Edit Pembelian"

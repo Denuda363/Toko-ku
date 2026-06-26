@@ -32,3 +32,19 @@ export interface Expense {
   amount: number;
   category: string;
 }
+
+export interface DebtPayment {
+  id: string;
+  date: string;
+  amount: number;
+}
+
+export interface Debt {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  paidAmount: number;
+  status: 'UNPAID' | 'PAID';
+  payments: DebtPayment[];
+}

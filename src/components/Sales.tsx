@@ -7,25 +7,24 @@ interface SalesProps {
   products: Product[];
   transactions: Transaction[];
   onCheckout: (items: TransactionItem[], total: number, date?: string) => void;
+  onUpdateTransaction: (id: string, items: TransactionItem[], total: number, date?: string) => void;
   onCancelTransaction: (id: string) => void;
 }
 
-export default function Sales({ products, transactions, onCheckout, onCancelTransaction }: SalesProps) {
+export default function Sales({ products, transactions, onCheckout, onUpdateTransaction, onCancelTransaction }: SalesProps) {
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<TransactionItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [transactionDate, setTransactionDate] = useState(() => {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    return now.toISOString().slice(0, 16);
-  });
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
 
   const getLocalDatetime = (dateString?: string) => {
     const d = dateString ? new Date(dateString) : new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 16);
   };
+
+  const [transactionDate, setTransactionDate] = useState(() => getLocalDatetime());
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => 
@@ -96,7 +95,12 @@ export default function Sales({ products, transactions, onCheckout, onCancelTran
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
-    onCheckout(cart, total, new Date(transactionDate).toISOString());
+    if (editingTransactionId) {
+      onUpdateTransaction(editingTransactionId, cart, total, new Date(transactionDate).toISOString());
+      setEditingTransactionId(null);
+    } else {
+      onCheckout(cart, total, new Date(transactionDate).toISOString());
+    }
     setCart([]);
     setIsCartOpen(false);
     
@@ -202,13 +206,11 @@ export default function Sales({ products, transactions, onCheckout, onCancelTran
                       <div className="flex gap-2">
                         <button 
                           onClick={() => {
-                            if (window.confirm('Edit transaksi ini? Stok akan dikembalikan sementara ke inventaris sampai Anda menyimpannya ulang.')) {
-                              onCancelTransaction(trx.id);
-                              setCart([...trx.items]);
-                              setTransactionDate(getLocalDatetime(trx.date));
-                              setIsHistoryOpen(false);
-                              setIsCartOpen(true);
-                            }
+                            setEditingTransactionId(trx.id);
+                            setCart([...trx.items]);
+                            setTransactionDate(getLocalDatetime(trx.date));
+                            setIsHistoryOpen(false);
+                            setIsCartOpen(true);
                           }}
                           className="p-2 text-amber-400 hover:bg-amber-500/20 rounded-lg transition-colors border border-amber-500/20"
                           title="Edit Transaksi"
@@ -329,13 +331,27 @@ export default function Sales({ products, transactions, onCheckout, onCancelTran
             <span className="text-slate-400 text-[10px] font-semibold uppercase">Total Tagihan</span>
             <span className="text-2xl font-bold text-emerald-400">{formatIDR(total)}</span>
           </div>
-          <button 
-            onClick={handleCheckout}
-            disabled={cart.length === 0}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-white/10 disabled:text-white/30 disabled:cursor-not-allowed text-black font-bold py-3 md:py-4 rounded-lg transition-colors uppercase tracking-wide text-sm"
-          >
-            Selesaikan Pembayaran
-          </button>
+          <div className="flex flex-col gap-2">
+            {editingTransactionId && (
+              <button 
+                onClick={() => {
+                  setEditingTransactionId(null);
+                  setCart([]);
+                  setTransactionDate(getLocalDatetime());
+                }}
+                className="w-full bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-lg transition-colors uppercase tracking-wide text-sm"
+              >
+                Batal Edit
+              </button>
+            )}
+            <button 
+              onClick={handleCheckout}
+              disabled={cart.length === 0}
+              className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-white/10 disabled:text-white/30 disabled:cursor-not-allowed text-black font-bold py-3 md:py-4 rounded-lg transition-colors uppercase tracking-wide text-sm"
+            >
+              {editingTransactionId ? 'Simpan Perubahan' : 'Selesaikan Pembayaran'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

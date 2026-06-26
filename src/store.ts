@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Product, Transaction, Expense, TransactionItem } from './types';
+import { Product, Transaction, Expense, TransactionItem, Debt, DebtPayment } from './types';
 
 const INITIAL_PRODUCTS: Product[] = [
   { id: '1', name: 'Beras Premium 5kg', sku: 'BRS-001', stock: 20, purchasePrice: 60000, sellingPrice: 65000, category: 'Sembako' },
@@ -59,6 +59,52 @@ export function useAppStore() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
   const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
+  const [debts, setDebts] = useState<Debt[]>([]);
+
+  // Automatically sync tempo purchases into debts if needed, or manage them separately.
+  // Actually, let's keep debts as a general module.
+
+  const addDebt = (description: string, amount: number, date?: string) => {
+    const newDebt: Debt = {
+      id: `DBT-${Date.now()}`,
+      date: date || new Date().toISOString(),
+      description,
+      amount,
+      paidAmount: 0,
+      status: 'UNPAID',
+      payments: []
+    };
+    setDebts([newDebt, ...debts]);
+  };
+
+  const addDebtPayment = (debtId: string, amount: number, date?: string) => {
+    setDebts(debts.map(d => {
+      if (d.id === debtId) {
+        const newPaidAmount = d.paidAmount + amount;
+        const newPayment = {
+          id: `PMT-${Date.now()}`,
+          date: date || new Date().toISOString(),
+          amount
+        };
+        return {
+          ...d,
+          paidAmount: newPaidAmount,
+          status: newPaidAmount >= d.amount ? 'PAID' : 'UNPAID',
+          payments: [...d.payments, newPayment]
+        };
+      }
+      return d;
+    }));
+  };
+
+  const updateDebt = (updatedDebt: Debt) => {
+    setDebts(debts.map(d => d.id === updatedDebt.id ? updatedDebt : d));
+  };
+
+  const deleteDebt = (debtId: string) => {
+    setDebts(debts.filter(d => d.id !== debtId));
+  };
+
 
   // In a real app, we would sync this to localStorage or a database.
   
@@ -82,6 +128,36 @@ export function useAppStore() {
     }));
   };
 
+  const updateSale = (id: string, items: TransactionItem[], total: number, date?: string) => {
+    const oldTrx = transactions.find(t => t.id === id);
+    if (!oldTrx || oldTrx.type !== 'SALE') return;
+
+    let currentProducts = [...products];
+    // Revert old items
+    oldTrx.items.forEach(oldItem => {
+      const pIndex = currentProducts.findIndex(p => p.id === oldItem.productId);
+      if (pIndex >= 0) {
+        currentProducts[pIndex] = { ...currentProducts[pIndex], stock: currentProducts[pIndex].stock + oldItem.quantity };
+      }
+    });
+
+    // Apply new items
+    items.forEach(newItem => {
+      const pIndex = currentProducts.findIndex(p => p.id === newItem.productId);
+      if (pIndex >= 0) {
+        currentProducts[pIndex] = { ...currentProducts[pIndex], stock: currentProducts[pIndex].stock - newItem.quantity };
+      }
+    });
+
+    setProducts(currentProducts);
+    setTransactions(transactions.map(t => t.id === id ? {
+      ...t,
+      items,
+      total,
+      date: date || t.date
+    } : t));
+  };
+
   const addPurchase = (items: TransactionItem[], total: number, paymentMethod?: 'tunai' | 'tempo' | 'tf', date?: string) => {
     const newTransaction: Transaction = {
       id: `TRX-${Date.now()}`,
@@ -93,6 +169,20 @@ export function useAppStore() {
     };
     setTransactions([newTransaction, ...transactions]);
     
+    if (paymentMethod === 'tempo') {
+      const debtDesc = `Pembelian Tempo (${items.length} item)`;
+      const newDebt: Debt = {
+        id: `DBT-${Date.now()}`,
+        date: date || new Date().toISOString(),
+        description: debtDesc,
+        amount: total,
+        paidAmount: 0,
+        status: 'UNPAID',
+        payments: []
+      };
+      setDebts([newDebt, ...debts]);
+    }
+
     // Increase stock
     setProducts(products.map(p => {
       const boughtItem = items.find(i => i.productId === p.id);
@@ -101,6 +191,37 @@ export function useAppStore() {
       }
       return p;
     }));
+  };
+
+  const updatePurchase = (id: string, items: TransactionItem[], total: number, paymentMethod?: 'tunai' | 'tempo' | 'tf', date?: string) => {
+    const oldTrx = transactions.find(t => t.id === id);
+    if (!oldTrx || oldTrx.type !== 'PURCHASE') return;
+
+    let currentProducts = [...products];
+    // Revert old items
+    oldTrx.items.forEach(oldItem => {
+      const pIndex = currentProducts.findIndex(p => p.id === oldItem.productId);
+      if (pIndex >= 0) {
+        currentProducts[pIndex] = { ...currentProducts[pIndex], stock: currentProducts[pIndex].stock - oldItem.quantity };
+      }
+    });
+
+    // Apply new items
+    items.forEach(newItem => {
+      const pIndex = currentProducts.findIndex(p => p.id === newItem.productId);
+      if (pIndex >= 0) {
+        currentProducts[pIndex] = { ...currentProducts[pIndex], stock: currentProducts[pIndex].stock + newItem.quantity };
+      }
+    });
+
+    setProducts(currentProducts);
+    setTransactions(transactions.map(t => t.id === id ? {
+      ...t,
+      items,
+      total,
+      paymentMethod: paymentMethod || t.paymentMethod,
+      date: date || t.date
+    } : t));
   };
 
   const updateProduct = (updatedProduct: Product) => {
@@ -168,12 +289,47 @@ export function useAppStore() {
     setTransactions(transactions.filter(t => t.id !== transactionId));
   };
 
+  const exportData = () => {
+    return JSON.stringify({
+      products,
+      transactions,
+      expenses,
+      debts
+    });
+  };
+
+  const importData = (jsonData: string) => {
+    try {
+      const parsed = JSON.parse(jsonData);
+      if (parsed.products) setProducts(parsed.products);
+      if (parsed.transactions) setTransactions(parsed.transactions);
+      if (parsed.expenses) setExpenses(parsed.expenses);
+      if (parsed.debts) setDebts(parsed.debts);
+      return true;
+    } catch (e) {
+      console.error("Gagal mengimpor data:", e);
+      return false;
+    }
+  };
+
+  const resetData = () => {
+    if (window.confirm("Peringatan: Semua data akan dihapus dan dikembalikan ke data awal. Anda yakin?")) {
+      setProducts(INITIAL_PRODUCTS);
+      setTransactions(INITIAL_TRANSACTIONS);
+      setExpenses(INITIAL_EXPENSES);
+      setDebts([]);
+    }
+  };
+
   return {
     products,
     transactions,
     expenses,
+    debts,
     addSale,
+    updateSale,
     addPurchase,
+    updatePurchase,
     addExpense,
     updateExpense,
     deleteExpense,
@@ -181,7 +337,14 @@ export function useAppStore() {
     addProduct,
     deleteProduct,
     cancelSaleTransaction,
-    cancelPurchaseTransaction
+    cancelPurchaseTransaction,
+    addDebt,
+    addDebtPayment,
+    updateDebt,
+    deleteDebt,
+    exportData,
+    importData,
+    resetData
   };
 }
 
